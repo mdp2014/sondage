@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// === REMPLACE ces valeurs ===
+// === TES CLÉS EN ENTIER, PAS DE TRONQUAGE ===
 const supabaseUrl = "https://isminhbqvaesxzhwtpcu.supabase.co";
 const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlzbWluaGJxdmFlc3h6aHd0cGN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAyNDcxMDEsImV4cCI6MjA2NTgyMzEwMX0.mQVT4CpljRw8MhBpxxdusj51PnnNTtPD4AbMdUEX1aY";
 
@@ -14,7 +14,6 @@ let pollId = null;
 const localStoragePrefix = "voted_poll_";
 
 async function loadPoll() {
-  // Récupère le premier sondage existant
   const { data: poll, error: pollError } = await supabase
     .from("polls")
     .select("*")
@@ -44,19 +43,11 @@ async function loadPoll() {
   const hasVoted = !!localStorage.getItem(storageKey);
 
   if (!hasVoted) {
-    // Affiche les options cliquables
+    optionsEl.innerHTML = "";
     options.forEach(opt => {
       const div = document.createElement("div");
       div.className = "option";
       div.textContent = opt.text;
-
-      // Barre de vote invisible en mode vote
-      const barContainer = document.createElement("div");
-      barContainer.className = "bar-container";
-      const bar = document.createElement("div");
-      bar.className = "bar";
-      barContainer.appendChild(bar);
-      div.appendChild(barContainer);
 
       div.addEventListener("click", async () => {
         const { error } = await supabase.from("votes").insert({ option_id: opt.id });
@@ -66,7 +57,6 @@ async function loadPoll() {
         }
         localStorage.setItem(storageKey, "1");
         statusEl.textContent = "Merci pour votre vote !";
-        optionsEl.innerHTML = "";
         showResults();
       });
 
@@ -81,7 +71,7 @@ async function loadPoll() {
 async function showResults() {
   const { data: options, error } = await supabase
     .from("options")
-    .select("id, text, votes:votes(count)")
+    .select(`id, text, votes(count)`)
     .eq("poll_id", pollId);
 
   if (error || !options) {
@@ -91,29 +81,25 @@ async function showResults() {
 
   optionsEl.innerHTML = "";
 
-  const totalVotes = options.reduce((sum, opt) => sum + opt.votes.length, 0);
+  const totalVotes = options.reduce((sum, opt) => sum + (opt.votes?.count ?? 0), 0);
 
   options.forEach(opt => {
-    const percent = totalVotes === 0 ? 0 : Math.round((opt.votes.length / totalVotes) * 100);
+    const count = opt.votes?.count ?? 0;
+    const percent = totalVotes === 0 ? 0 : Math.round((count / totalVotes) * 100);
 
     const div = document.createElement("div");
     div.className = "option disabled";
-    div.textContent = `${opt.text} — ${opt.votes.length} vote${opt.votes.length > 1 ? "s" : ""}`;
+    div.textContent = `${opt.text} — ${count} vote${count > 1 ? "s" : ""}`;
 
-    // Barre graphique
     const barContainer = document.createElement("div");
     barContainer.className = "bar-container";
     const bar = document.createElement("div");
     bar.className = "bar";
+    bar.style.width = percent + "%";
+
     barContainer.appendChild(bar);
     div.appendChild(barContainer);
-
     optionsEl.appendChild(div);
-
-    // Animation barre après ajout dans DOM
-    requestAnimationFrame(() => {
-      bar.style.width = percent + "%";
-    });
   });
 }
 
